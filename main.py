@@ -1,14 +1,17 @@
 from asyncio.windows_events import INFINITE, NULL
 import math
 import random
-from time import time
+from time import sleep, time
 import tkinter as tk
 from tkinter import HORIZONTAL, VERTICAL, Label, StringVar, ttk, colorchooser
 import os
 from os import walk
-import pandas as pd
-import numpy as np
-#utiliser la librarie Pandas table sous forme id / x / y
+from client import Client
+from edge import Edge
+from g import G
+from node import Node
+from solution import Solution
+
 root = tk.Tk()
 
 #Application du theùe
@@ -54,66 +57,9 @@ configuration = tk.Frame(root, bg="#FFFFFF")
 configuration.grid(column=3, row=1, sticky="nes")
 
 filenames = []
-#nodes = pd.DataFrame(columns=["x","y","root"])
-nodes = np.empty((0,3), np.float64)
-arcs = np.empty((0,3), np.float64)
-allArcs = arcs
-
-
-
-
 graphList = []
 
-class Client():
-    def __init__(self):
-        self.displayNodes = tk.BooleanVar(root, True) 
-        self.displayEdges = tk.BooleanVar(root, True)
-        self.edgeSize = tk.DoubleVar(root, 1) 
-        self.nodesColorCode = ((255,0,0), '#FF0000')
-        self.edgesColorCode = ((255,255,255), '#FFFFFF')
-        self.demoMode = tk.BooleanVar(root, False) 
-        
-    def selectNodesColor(self):
-        self.nodesColorCode = colorchooser.askcolor(title ="Choose nodes color")
-        
-    def selectEdgesColor(self):
-        self.edgesColorCode = colorchooser.askcolor(title ="Choose edges color") 
-client = Client()
-
-class G():
-    def __init__(self):
-        self.nodesList = []
-        self.edgesList = []
-        self.spawningTree = []
-        self.perfectMatchingEdges = []
-        self.eulerianCycle = []
-        self.hamiltonianCycleNodes = []
-        self.hamiltonianCycleEdges = []
-        
-    def addNode(self, _node):
-        self.nodesList.append(_node)
-        
-    def refreshEdgesList(self):
-        self.edgesList = []
-        for node in self.nodesList :
-            self.edgesList = self.edgesList + node.edgesList 
-    
-class Edge():
-    def __init__(self, _startNode, _finishNode, _cost):
-        self.startNode = _startNode
-        self.finishNode = _finishNode
-        self.cost = _cost
-        
-    def getCost(self):
-        return self.cost
-        
-class Node():
-    def __init__(self, _id, _x, _y):
-        self.id = _id
-        self.x = _x 
-        self.y = _y
-        self.root = self
-        self.edgesList = []
+client = Client(root)
 
 def filesList():
     global filenames
@@ -260,7 +206,9 @@ def loadBenchmark():
     drawEdges(graphList[0], graphList[0].perfectMatchingEdges, '#FF0000')
     eulerian(graphList[0])
     hamiltonian(graphList[0])
-    #drawEdges(graphList[0], eulerianCycle, '#00FF00')
+    drawEdges(graphList[0], graphList[0].bestSolution.hamiltonianCycleEdges, '#00FF00')
+    
+    two_opt(graphList[0])
     
     print("Temps de chargement total : " + str(time() - currentTime) + ".")
     
@@ -295,7 +243,7 @@ def perfectMatching(_graph):
         for oddNode in oddDegreeNodes :
             tempCost = math.sqrt(math.pow(currentNode.x - oddNode.x, 2) + math.pow(currentNode.y - oddNode.y, 2))
             if tempCost < cost:
-                print(str(currentNode.id), " cible", str(oddNode.id), ", cost = ", str(tempCost))
+                #print(str(currentNode.id), " cible", str(oddNode.id), ", cost = ", str(tempCost))
                 #/test
                 #communEdges = [x for x in _graph.edgesList if (x.startNode == oddNode and x.finishNode == currentNode) or (x.startNode == currentNode and x.finishNode == oddNode)]
                 #if len(communEdges) > 2 : continue
@@ -352,17 +300,17 @@ def eulerian(_graph):# Appliquer l'algorithme de Hierholzer
     currentNode = _graph.nodesList[0]
     [eulerianGraph, tempArcs] = getCycle(_graph, currentNode, tempArcs)
     _graph.eulerianCycle = eulerianGraph
-    #for edge in eulerianGraph:
-    #    print(str(edge.startNode.id), str(edge.finishNode.id))
 
 def hamiltonian(_graph):
     visitingNodeOrder = []
     edgesList = []
     
+    """
     print("BEFORE")
     for edge in _graph.eulerianCycle:
         print(str(edge.startNode.id), str(edge.finishNode.id))
-        
+    """
+    
     for edge in _graph.eulerianCycle:
         if edge.startNode in visitingNodeOrder : continue
         visitingNodeOrder.append(edge.startNode)
@@ -372,40 +320,85 @@ def hamiltonian(_graph):
         cost = math.sqrt(math.pow(visitingNodeOrder[i].x - visitingNodeOrder[i+1].x, 2) + math.pow(visitingNodeOrder[i].y - visitingNodeOrder[i+1].y, 2))
         edgesList.append(Edge(visitingNodeOrder[i], visitingNodeOrder[i+1], cost))
     
-    _graph.hamiltonianCycleNodes = visitingNodeOrder
-    _graph.hamiltonianCycleEdges = edgesList
+    #_graph.hamiltonianCycleNodes = visitingNodeOrder
+    #_graph.hamiltonianCycleEdges = edgesList
     
+    
+    """
     print("AFTER")
     for edge in edgesList:
         print(str(edge.startNode.id), str(edge.finishNode.id))
-    #drawEdges(_graph, edgesList, '#FF0000')
+    drawEdges(_graph, edgesList, '#00FF00')
+    """
     
     cost = 0
     for edge in edgesList:
         cost = cost + edge.cost
+        
+    _graph.bestSolution = Solution(visitingNodeOrder, edgesList, cost)
     updateCostTour(cost)
-    
-def resolveChristofides():
-    global arcs
-    currentTime = time()
-    arcs = pd.concat([arcs, perfectMatching()], axis=0, ignore_index=True)    
-    #drawArcs(arcs, '#FFFFFF') 
 
-    eulerianGraph = eulerian()
-    #print(eulerianGraph)
-    #drawArcs(eulerianGraph, '#FFFFFF')
-    
-    hamiltonien = hamiltonian(eulerianGraph)
-    #print(hamiltonian)
-    #drawArcs(hamiltonien, '#FF0000')
-    #print(eulerianGraph['idE'].value_counts())
-    updateCostTour(round(hamiltonien['cost'].sum(),2))
-    print("Temps de chargement : " + str(time() - currentTime) + ".")
 
+def draw_opt(_nodesChain):
+    canvas.delete("all")
+    if client.displayNodes.get() : drawNodes(graphList[0], client.nodesColorCode[1])
+    
+
+    
+
+def two_opt(_graph): 
+    s0 = _graph.bestSolution.hamiltonianCycleNodes
+    print("best : ", str(_graph.bestSolution.cost))
+    
+    sn = s0
+    bestFound = s0.copy()
+    bestCost = _graph.bestSolution.cost
+    cost = _graph.bestSolution.cost
+    edges = []
+    
+    #for node in s0:
+    #    print(str(node.id))
+    
+    improve = True
+    while improve == True : 
+        improve = False
+        for i in range(len(s0) - 1) :
+            for j in range(len(s0) - 1) :
+                if i == j : continue
+                
+                sn = s0[:]
+                sn.pop()
+                sn[i], sn[j] = sn[j], sn[i]
+                sn.append(sn[0])
+                
+                
+                cost = 0
+                for y in range(len(s0) - 1) :
+                    cost = cost + math.sqrt(math.pow(sn[y].x - sn[y+1].x, 2) + math.pow(sn[y].y - sn[y+1].y, 2))
+                    #print("cost from ", str(sn[y].id), " to ", str(sn[y+1].id), " =", cost)  
+                
+                if  cost < bestCost :
+                    #print("trouvé mieux")
+                    bestFound = sn[:]
+                    bestCost = cost
+                    improve = True
+        s0 = bestFound[:]
+        
+        #print("BEST found :")
+        #for node in bestFound :
+        #    print(str(node.id))
+        #print(bestCost)
+    
+    for i in range(len(s0) - 1) :
+        edges.append(Edge(s0[i], s0[i+1], 0))
+        
+    _graph.bestSolution = Solution(bestFound,edges,bestCost)
+    updateCostTour(bestCost)
+    drawEdges(_graph, edges, "#0000FF")
+    
 filesList()
 
 validate = tk.Button(root, text="Load", command=loadBenchmark).grid(column=0, row=3)
-resolveChristofidesBtn = tk.Button(root, text="Resolve with Christofides", command=resolveChristofides).grid(column=2, row=2, pady=10)
 drawNodesRadio = tk.Checkbutton(configuration, text="Display nodes", var=client.displayNodes, command=refreshDraw, bg="white").grid(column=0, row=0, pady=5)
 drawEdgesRadio = tk.Checkbutton(configuration, text="Display edges", var=client.displayEdges, command=refreshDraw, bg="white").grid(column=0, row=1, pady=5)
 edgesSizeScale = tk.Scale(configuration, orient='horizontal', var=client.edgeSize, command=refreshDraw, from_=0.5, to=10, resolution=0.25, tickinterval=4, length=100, label='Edge size', bg="white").grid(column=0, row=2, pady=5)
