@@ -38,11 +38,7 @@ scrollbarV.config(command=listbox.yview)
 scrollbarH.config(command=listbox.xview)
 
 cost_text = StringVar()
-progressbar_label = Label(root, textvariable=cost_text, bg="white").grid(column=2, columnspan=1, row=3)
-
-progressbar_text = StringVar()
-progressbar_label = Label(root, textvariable=progressbar_text, bg="white").grid(column=0, columnspan=3, row=4)
-progressbar = ttk.Progressbar(root, orient='horizontal', mode='determinate', length=850).grid(column=0, columnspan=4, row=5, sticky="we")
+cost_label = Label(root, textvariable=cost_text, bg="white").grid(column=2, columnspan=1, row=3)
 
 canvasHeight = 600
 canvasWidth = 700
@@ -74,7 +70,6 @@ def readfile(benchmark):
     currentTime = time()
     file = open(abs_file_path + "/" + filenames[benchmark], "r")
     
-    #updateProgressBar(20, "Loading file...")
     i = 0
     for line in file:
         if i == 4:
@@ -101,21 +96,17 @@ def readfile(benchmark):
     
 def loadFullGraphArcs(_graph):
     currentTime = time()
-    #updateProgressBar(30, "Creation of graph arcs...")  
     #Calcul du poids de tous les arcs pour avoir un graph complet
     nodesList = _graph.nodesList
     for startNode in nodesList :
         for finishNode in nodesList :
             if startNode == finishNode : continue
-            #if finishNode in nodesList.edgesList and startNode in nodesList.edgesList : continue
             cost = math.sqrt(math.pow(startNode.x - finishNode.x, 2) + math.pow(startNode.y - finishNode.y, 2))
             startNode.edgesList.append(Edge(startNode, finishNode, cost))
             
     print("Completed graph time : " + str(time() - currentTime) + ".")
     
 def Kruskal(_graph): #Permet de générer un arbre couvrant minimal
-    #updateProgressBar(60, "Minimum spanning tree generation...")
-    #arcs = arcs.sort_values(by=['cost'])
     currentTime = time()
     arcsKruskal = []
     _graph.refreshEdgesList()
@@ -151,6 +142,21 @@ def drawEdges(_graph, _edges, color):
         x2 = (edge.finishNode.x*canvasWidth)/maxX
         y2 = (edge.finishNode.y*canvasHeight)/maxY
         canvas.create_line(x1,y1,x2,y2, fill=color, width=client.edgeSize.get())
+        
+        #Ajout du mode démo
+        if client.demoMode.get() == True : 
+            while client.isPause == True or (client.isNext == False and client.autoNext.get() == False):
+                sleep(.1)
+                print("In pause...")
+                root.update()
+                
+            if client.autoNext.get() == True :
+                sleep(client.sleepTime.get())
+                canvas.update()
+                continue
+            
+            canvas.update()
+            client.isNext = False
 
 def drawNodes(_graph, color):
     maxX = sorted(_graph.nodesList, key=lambda x: x.x)[len(_graph.nodesList) - 1].x# = canvasWidth (prend le maximum x des noeuds du graph )
@@ -173,15 +179,19 @@ def drawNodes(_graph, color):
 def updateCostTour(cost):
     global cost_text
     cost_text.set("Best tour found : " + str(cost))
-    
-def updateProgressBar(a, text):
-    progressbar['value'] = a
-    progressbar_text.set(text)
-    root.update()
 
 def refreshDraw(*args):
     canvas.delete("all")
-    if client.displayEdges.get() and len(graphList) > 0 : drawEdges(graphList[0], graphList[0].spawningTree, client.edgesColorCode[1])
+    if client.displayNodes.get() and len(graphList) > 0 : drawNodes(graphList[0], client.nodesColorCode[1])
+    if client.displayEdges.get() and len(graphList) > 0 : 
+        if graphList[0].bestSolution != 0 : 
+            drawEdges(graphList[0], graphList[0].bestSolution.hamiltonianCycleEdges, client.edgesColorCode[1])
+        elif len(graphList[0].eulerianCycle) > 0 : 
+            drawEdges(graphList[0], graphList[0].eulerianCycle, client.edgesColorCode[1])
+        elif len(graphList[0].perfectMatchingEdges) > 0 : 
+            drawEdges(graphList[0], graphList[0].perfectMatchingEdges, "#FFFF00")
+            drawEdges(graphList[0], graphList[0].spawningTree, client.edgesColorCode[1])
+        else : drawEdges(graphList[0], graphList[0].spawningTree, client.edgesColorCode[1])
     if client.displayNodes.get() and len(graphList) > 0 : drawNodes(graphList[0], client.nodesColorCode[1])
     representationNodesColor.config(bg=client.nodesColorCode[1], fg=client.nodesColorCode[1])
     representationEdgesColor.config(bg=client.edgesColorCode[1], fg=client.edgesColorCode[1])
@@ -197,18 +207,19 @@ def loadBenchmark():
     
     if not readfile(listbox.curselection()[0]): return #S'il n'est pas possible de lire le fichier TSP, c'est qu'il n'est pas compatible.
     loadFullGraphArcs(graphList[0])
+    
     graphList[0].spawningTree = Kruskal(graphList[0])#Chargement de l'arbre couvrant de poids minimal
-    #drawGraphe(graphList[0])
-    #drawBenchmark()
-    if client.displayEdges.get() : drawEdges(graphList[0], graphList[0].spawningTree, client.edgesColorCode[1])
-    if client.displayNodes.get() : drawNodes(graphList[0], client.nodesColorCode[1])
+    refreshDraw(graphList[0])
+    
     perfectMatching(graphList[0])
-    drawEdges(graphList[0], graphList[0].perfectMatchingEdges, '#FF0000')
+    refreshDraw(graphList[0])
+    
     eulerian(graphList[0])
     hamiltonian(graphList[0])
-    drawEdges(graphList[0], graphList[0].bestSolution.hamiltonianCycleEdges, '#00FF00')
+    refreshDraw(graphList[0])
     
     two_opt(graphList[0])
+    refreshDraw(graphList[0])
     
     print("Temps de chargement total : " + str(time() - currentTime) + ".")
     
@@ -225,14 +236,6 @@ def perfectMatching(_graph):
             #print(edge.startNode.id, edge.finishNode.id)
         if count % 2 != 0 : oddDegreeNodes.append(currentNode)
     
-    """
-    print("MATCHING")
-    for oddNode in oddDegreeNodes :
-        for oddNode2 in oddDegreeNodes :
-            tempCost = math.sqrt(math.pow(oddNode.x - oddNode2.x, 2) + math.pow(oddNode.y - oddNode2.y, 2))
-            print(str(oddNode.id), str(oddNode2.id), str(tempCost))
-    """
-    
     #Ajouter une part d'aléatoire
     random.shuffle(oddDegreeNodes)
     
@@ -243,12 +246,6 @@ def perfectMatching(_graph):
         for oddNode in oddDegreeNodes :
             tempCost = math.sqrt(math.pow(currentNode.x - oddNode.x, 2) + math.pow(currentNode.y - oddNode.y, 2))
             if tempCost < cost:
-                #print(str(currentNode.id), " cible", str(oddNode.id), ", cost = ", str(tempCost))
-                #/test
-                #communEdges = [x for x in _graph.edgesList if (x.startNode == oddNode and x.finishNode == currentNode) or (x.startNode == currentNode and x.finishNode == oddNode)]
-                #if len(communEdges) > 2 : continue
-                #\test 
-                
                 cost = tempCost
                 tempNode = oddNode
         matchingEdges.append(Edge(currentNode, tempNode, cost))
@@ -275,9 +272,10 @@ def getCycle(_graph, _goalNode, _tempEdges):
         cycle.append(selected)
         tempEdges.remove(selected)
     
-    #r = lambda: random.randint(0,255)
-    #print('#%02X%02X%02X' % (r(),r(),r()))
-    #drawEdges(_graph, cycle, '#%02X%02X%02X' % (r(),r(),r()))
+    #if client.demoMode.get() == True :
+    #    r = lambda: random.randint(0,255)
+    #    #print('#%02X%02X%02X' % (r(),r(),r()))
+    #    drawEdges(_graph, cycle, '#%02X%02X%02X' % (r(),r(),r()))
             
     if len(tempEdges) > 0 :#A la fin d'un cycle, on va voir s'il existe encore des arcs qui n'ayant pas encore été parcouru. 
         for edge in cycle :
@@ -305,12 +303,6 @@ def hamiltonian(_graph):
     visitingNodeOrder = []
     edgesList = []
     
-    """
-    print("BEFORE")
-    for edge in _graph.eulerianCycle:
-        print(str(edge.startNode.id), str(edge.finishNode.id))
-    """
-    
     for edge in _graph.eulerianCycle:
         if edge.startNode in visitingNodeOrder : continue
         visitingNodeOrder.append(edge.startNode)
@@ -320,31 +312,12 @@ def hamiltonian(_graph):
         cost = math.sqrt(math.pow(visitingNodeOrder[i].x - visitingNodeOrder[i+1].x, 2) + math.pow(visitingNodeOrder[i].y - visitingNodeOrder[i+1].y, 2))
         edgesList.append(Edge(visitingNodeOrder[i], visitingNodeOrder[i+1], cost))
     
-    #_graph.hamiltonianCycleNodes = visitingNodeOrder
-    #_graph.hamiltonianCycleEdges = edgesList
-    
-    
-    """
-    print("AFTER")
-    for edge in edgesList:
-        print(str(edge.startNode.id), str(edge.finishNode.id))
-    drawEdges(_graph, edgesList, '#00FF00')
-    """
-    
     cost = 0
     for edge in edgesList:
         cost = cost + edge.cost
         
     _graph.bestSolution = Solution(visitingNodeOrder, edgesList, cost)
-    updateCostTour(cost)
-
-
-def draw_opt(_nodesChain):
-    canvas.delete("all")
-    if client.displayNodes.get() : drawNodes(graphList[0], client.nodesColorCode[1])
-    
-
-    
+    updateCostTour(cost)  
 
 def two_opt(_graph): 
     s0 = _graph.bestSolution.hamiltonianCycleNodes
@@ -371,17 +344,16 @@ def two_opt(_graph):
                 sn[i], sn[j] = sn[j], sn[i]
                 sn.append(sn[0])
                 
-                
                 cost = 0
                 for y in range(len(s0) - 1) :
                     cost = cost + math.sqrt(math.pow(sn[y].x - sn[y+1].x, 2) + math.pow(sn[y].y - sn[y+1].y, 2))
                     #print("cost from ", str(sn[y].id), " to ", str(sn[y+1].id), " =", cost)  
                 
                 if  cost < bestCost :
-                    #print("trouvé mieux")
                     bestFound = sn[:]
                     bestCost = cost
                     improve = True
+                    #print("trouvé mieux :", bestCost)
         s0 = bestFound[:]
         
         #print("BEST found :")
@@ -394,7 +366,7 @@ def two_opt(_graph):
         
     _graph.bestSolution = Solution(bestFound,edges,bestCost)
     updateCostTour(bestCost)
-    drawEdges(_graph, edges, "#0000FF")
+    #drawEdges(_graph, edges, "#0000FF")
     
 filesList()
 
@@ -412,9 +384,13 @@ representationEdgesColor = tk.Label(configuration, text="CCC", bg=client.edgesCo
 representationEdgesColor.grid(column=0, row=4, sticky="e", pady=5)
 
 demoModeRadio = tk.Checkbutton(configuration, text="DEMO MODE", var=client.demoMode, command=refreshDraw, bg="white").grid(column=0, row=5, pady=5)
+autoNextRadio = tk.Checkbutton(configuration, text="Auto next", var=client.autoNext, command=refreshDraw, bg="white").grid(column=0, row=6, pady=5)
+edgesSizeScale = tk.Scale(configuration, orient='horizontal', var=client.sleepTime, from_=0.1, to=2, resolution=.1, tickinterval=.8, length=100, label='Time step (s)', bg="white").grid(column=0, row=7, pady=5)
+pauseBtn = tk.Button(configuration, text="Pause", command=client.pause).grid(column=0, row=8, sticky="w")
+nextBtn = tk.Button(configuration, text=" Next ", command=client.next).grid(column=0, row=8, sticky="e")
+
 
 root.mainloop()
 
 
 #Charger un fichier => N'afficher que les villes
-#Cliquer sur Christofides => Afficher le graph complet ; Afficher l'arbre de poids minimal ; etc...
