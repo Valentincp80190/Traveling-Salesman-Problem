@@ -12,6 +12,7 @@ class Client():
         self.demoMode = tk.BooleanVar(root, False) 
         self.sleepTime = tk.DoubleVar(root, .5) 
         self.autoNext = tk.BooleanVar(root, False)
+        self.skipChristofides = tk.BooleanVar(root, True)
         self.isPause = False
         self.isNext = False
         

@@ -129,7 +129,7 @@ def Kruskal(_graph): #Permet de générer un arbre couvrant minimal
     print("Minimum spawning tree time : " + str(time() - currentTime) + ".")
     return arcsKruskal
 
-def drawEdges(_graph, _edges, color):
+def drawEdges(_graph, _edges, color, skip):
     maxX = sorted(_graph.nodesList, key=lambda x: x.x)[len(_graph.nodesList) - 1].x# = canvasWidth (prend le maximum x des noeuds du graph )
     maxY = sorted(_graph.nodesList, key=lambda x: x.y)[len(_graph.nodesList) - 1].y# = canvasHeight (prend le maximum y des noeuds du graph )
     
@@ -144,10 +144,10 @@ def drawEdges(_graph, _edges, color):
         canvas.create_line(x1,y1,x2,y2, fill=color, width=client.edgeSize.get())
         
         #Ajout du mode démo
-        if client.demoMode.get() == True : 
+        if client.demoMode.get() == True and skip == False: 
             while client.isPause == True or (client.isNext == False and client.autoNext.get() == False):
                 sleep(.1)
-                print("In pause...")
+                #print("In pause...")
                 root.update()
                 
             if client.autoNext.get() == True :
@@ -185,16 +185,49 @@ def refreshDraw(*args):
     if client.displayNodes.get() and len(graphList) > 0 : drawNodes(graphList[0], client.nodesColorCode[1])
     if client.displayEdges.get() and len(graphList) > 0 : 
         if graphList[0].bestSolution != 0 : 
-            drawEdges(graphList[0], graphList[0].bestSolution.hamiltonianCycleEdges, client.edgesColorCode[1])
+            drawEdges(graphList[0], graphList[0].bestSolution.hamiltonianCycleEdges, client.edgesColorCode[1], False)
         elif len(graphList[0].eulerianCycle) > 0 : 
-            drawEdges(graphList[0], graphList[0].eulerianCycle, client.edgesColorCode[1])
-        elif len(graphList[0].perfectMatchingEdges) > 0 : 
-            drawEdges(graphList[0], graphList[0].perfectMatchingEdges, "#FFFF00")
-            drawEdges(graphList[0], graphList[0].spawningTree, client.edgesColorCode[1])
-        else : drawEdges(graphList[0], graphList[0].spawningTree, client.edgesColorCode[1])
+            drawEdges(graphList[0], graphList[0].eulerianCycle, client.edgesColorCode[1], False)
+        elif len(graphList[0].perfectMatchingEdges) > 0 :
+            drawEdges(graphList[0], graphList[0].spawningTree, client.edgesColorCode[1], True)
+            drawEdges(graphList[0], graphList[0].perfectMatchingEdges, "#FFFF00", False)
+        else : drawEdges(graphList[0], graphList[0].spawningTree, client.edgesColorCode[1], False)
     if client.displayNodes.get() and len(graphList) > 0 : drawNodes(graphList[0], client.nodesColorCode[1])
     representationNodesColor.config(bg=client.nodesColorCode[1], fg=client.nodesColorCode[1])
     representationEdgesColor.config(bg=client.edgesColorCode[1], fg=client.edgesColorCode[1])
+
+def drawSolution(solution):
+    canvas.delete("all")
+    
+    if client.displayEdges.get() and len(graphList) > 0 : 
+        maxX = sorted(solution.hamiltonianCycleNodes, key=lambda x: x.x)[len(solution.hamiltonianCycleNodes) - 1].x# = canvasWidth (prend le maximum x des noeuds du graph )
+        maxY = sorted(solution.hamiltonianCycleNodes, key=lambda x: x.y)[len(solution.hamiltonianCycleNodes) - 1].y# = canvasHeight (prend le maximum y des noeuds du graph )
+        
+        #Représentation des arcs    
+        #updateProgressBar(80, "Preparing to display graph arcs...")
+        
+        for edge in solution.hamiltonianCycleEdges :
+            x1 = (edge.startNode.x*canvasWidth)/maxX
+            y1 = (edge.startNode.y*canvasHeight)/maxY
+            x2 = (edge.finishNode.x*canvasWidth)/maxX
+            y2 = (edge.finishNode.y*canvasHeight)/maxY
+            canvas.create_line(x1,y1,x2,y2, fill=client.edgesColorCode[1], width=client.edgeSize.get())
+            
+    if client.displayNodes.get() and len(graphList) > 0 : 
+        for node in solution.hamiltonianCycleNodes :
+            #Représentation des noeuds
+            xC = (node.x*canvasWidth)/maxX
+            yC = (node.y*canvasHeight)/maxY
+            canvas.create_rectangle(xC-4, yC-4, xC+4, yC+4, fill=client.nodesColorCode[1])
+            
+            offsetX = -10
+            offsetY = 0
+            if yC/canvasHeight > .85: offsetY = -10
+            elif  yC/canvasHeight < .15: offsetY = 10
+            if xC/canvasWidth < .15: offsetX = 10
+            #Représentation des identifiants des noeuds
+            canvas.create_text(xC+offsetX, yC+offsetY, text=node.id, fill="#FFFFFF")
+    canvas.update()
     
 def loadBenchmark():
     currentTime = time()
@@ -219,8 +252,9 @@ def loadBenchmark():
     refreshDraw(graphList[0])
     
     two_opt(graphList[0])
-    refreshDraw(graphList[0])
+    drawSolution(graphList[0].bestSolution)
     
+    two_opt(graphList[0])
     print("Temps de chargement total : " + str(time() - currentTime) + ".")
     
 def perfectMatching(_graph):
@@ -354,6 +388,17 @@ def two_opt(_graph):
                     bestCost = cost
                     improve = True
                     #print("trouvé mieux :", bestCost)
+                    
+                    if client.demoMode.get() == True :
+                        tempEdges = []
+                        
+                        for i in range(len(bestFound) - 1) :
+                            tempEdges.append(Edge(s0[i], s0[i+1], 0))
+                            
+                        solution = Solution(bestFound, tempEdges, 0)
+                        drawSolution(solution)
+                        sleep(client.sleepTime.get())
+                        
         s0 = bestFound[:]
         
         #print("BEST found :")
