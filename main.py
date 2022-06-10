@@ -211,16 +211,53 @@ def loadBenchmark():
     
     eulerian(graphList[0])
     hamiltonian(graphList[0])
-    refreshDraw(graphList[0])
+    #refreshDraw(graphList[0])
     
-    two_opt(graphList[0])
-    drawSolution(graphList[0].bestSolution)
+    #two_opt(graphList[0])
+    #drawSolution(graphList[0].bestSolution)
     
-    window.showTrace(graphList[0].costListEvolution)
+    #window.showTrace(graphList[0].costListEvolution)
     
     print("Temps de chargement total : " + str(time() - currentTime) + ".")
     
+    
 def perfectMatching(_graph):
+    currentTime = time()
+    oddDegreeNodes = []
+    allEdges = []
+    matchingEdges = []
+    nodes = _graph.nodesList.copy()
+    
+    while len(nodes) > 0 :#Calcul des degrés impair. On regarde les occurences d'un noeud dans tous les arcs. Si le nombre d'occurences est impair, on ajoute à la liste des noeud impairs le noeud.
+        currentNode = nodes.pop(0)
+        count = 0
+        for edge in _graph.spawningTree :
+            if edge.startNode == currentNode or edge.finishNode == currentNode : count = count + 1
+        if count % 2 != 0 : oddDegreeNodes.append(currentNode)
+        
+    for i in range(len(oddDegreeNodes) - 1) :
+        for j in range(len(oddDegreeNodes)) :
+            if i == j : continue
+            cost = math.sqrt(math.pow(oddDegreeNodes[i].x - oddDegreeNodes[j].x, 2) + math.pow(oddDegreeNodes[i].y - oddDegreeNodes[j].y, 2))
+            allEdges.append(Edge(oddDegreeNodes[i],oddDegreeNodes[j], cost))
+    
+    allEdges = sorted(allEdges, key=lambda x: x.cost)
+    
+    for edge in allEdges :
+        if len(oddDegreeNodes) == 0: break 
+        if edge.startNode not in oddDegreeNodes or edge.finishNode not in oddDegreeNodes : continue
+        matchingEdges.append(edge)
+        oddDegreeNodes.remove(edge.startNode)
+        oddDegreeNodes.remove(edge.finishNode)
+            
+    #for edge in matchingEdges :
+    #    print(str(edge.startNode.id), str(edge.finishNode.id), edge.cost)
+    _graph.perfectMatchingEdges = matchingEdges
+    print("Perfect matching time : " + str(time() - currentTime) + ".")
+    
+    
+"""def perfectMatching(_graph):
+    currentTime = time()
     oddDegreeNodes = []
     matchingEdges = []
     nodes = _graph.nodesList.copy()
@@ -249,6 +286,7 @@ def perfectMatching(_graph):
         oddDegreeNodes.remove(tempNode)
     
     _graph.perfectMatchingEdges = matchingEdges
+    print("Perfect matching time : " + str(time() - currentTime) + ".")"""
 
 def getCycle(_graph, _goalNode, _tempEdges):
     cycle = []
@@ -318,7 +356,6 @@ def hamiltonian(_graph):
     window.cost_text.set("Best tour found : " + str(cost))
 
 def two_opt(_graph): 
-    loop = 0
     currentTime = time()
     s0 = _graph.bestSolution.hamiltonianCycleNodes
     #print("best : ", str(_graph.bestSolution.cost))
@@ -331,9 +368,9 @@ def two_opt(_graph):
     
     #for node in s0:
     #    print(str(node.id))
-    
+    loop = 0
     improve = True
-    while improve == True and loop < 1000: 
+    while improve == True: 
         improve = False
         for i in range(len(s0) - 1) :
             for j in range(len(s0) - 1) :
@@ -367,6 +404,9 @@ def two_opt(_graph):
                         drawSolution(solution)
                         window.cost_text.set("Best tour found : " + str(bestCost))
                         sleep(client.sleepTime.get())
+                        
+                    #CONDITION D'ARRET
+                    if loop > 50 : break
                     loop = loop + 1
                         
         s0 = bestFound[:]
