@@ -1,5 +1,6 @@
 class G():
     def __init__(self):
+        self.costListEvolution = []
         self.nodesList = []
         self.edgesList = []
         self.spawningTree = []

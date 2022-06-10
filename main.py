@@ -11,51 +11,17 @@ from edge import Edge
 from g import G
 from node import Node
 from solution import Solution
-
-root = tk.Tk()
-
-#Application du theùe
-style = ttk.Style(root)
-style.theme_use('winnative')
-
-root['bg']='white'
-root.title("Traveling Salesman Problem")
-root.resizable(0, 0)
-
-tk.Label(root, text="Benchmarks", bg="white").grid(column=0, row=0)
-tk.Label(root, text="Simulation", bg="white").grid(column=2, row=0)
-tk.Label(root, text="Configuration", bg="white").grid(column=3, row=0)
-
-listbox = tk.Listbox(root)
-scrollbarV = tk.Scrollbar(root, orient=VERTICAL)
-scrollbarH = tk.Scrollbar(root, orient=HORIZONTAL)
-scrollbarV.grid(column=1, row=1, sticky="ns")
-scrollbarH.grid(column=0, row=2, sticky="ew")
-listbox.grid(column=0, row=1, sticky="nsew") # north + east [...]
-listbox.config(yscrollcommand=scrollbarV.set)
-listbox.config(xscrollcommand=scrollbarH.set)
-scrollbarV.config(command=listbox.yview)
-scrollbarH.config(command=listbox.xview)
-
-cost_text = StringVar()
-cost_label = Label(root, textvariable=cost_text, bg="white").grid(column=2, columnspan=1, row=3)
-
-canvasHeight = 600
-canvasWidth = 700
-canvas = tk.Canvas(root, bg="#202020", height=canvasHeight, width=canvasWidth)
-canvas.grid(column=2, row=1)
+from window import Window
 
 script_dir = os.path.dirname(__file__) # Récupérer le chemin relatif au script
 rel_path = "benchmarks"
 abs_file_path = os.path.join(script_dir, rel_path) #Trouve le chemin absolu du dossier benchmarks
 
-configuration = tk.Frame(root, bg="#FFFFFF")
-configuration.grid(column=3, row=1, sticky="nes")
-
 filenames = []
 graphList = []
 
-client = Client(root)
+window = Window()
+client = Client(window.root)
 
 def filesList():
     global filenames
@@ -63,7 +29,7 @@ def filesList():
     filenames = [ file for file in filenames if file.endswith(".tsp") ] #Exclu les mauvaises extensions
 
     for filename in filenames: #Inject dans la liste à afficher les noms sans leur extensions
-        listbox.insert(tk.END, filename[:filename.index('.')])
+        window.listbox.insert(tk.END, filename[:filename.index('.')])
 
 def readfile(benchmark):
     global graphList
@@ -77,7 +43,7 @@ def readfile(benchmark):
             line = line.replace('EDGE_WEIGHT_TYPE:', '')
             line = line.replace('\n','')
             if line != "EUC_2D":
-                canvas.create_text(350,300, text="BENCHMARK NOT COMPATIBLE", fill="#FF0000")
+                window.canvas.create_text(350,300, text="BENCHMARK NOT COMPATIBLE", fill="#FF0000")
                 #updateProgressBar(0, " ")
                 return False
             else : graphList.append(G())
@@ -137,25 +103,25 @@ def drawEdges(_graph, _edges, color, skip):
     #updateProgressBar(80, "Preparing to display graph arcs...")
     
     for edge in _edges :
-        x1 = (edge.startNode.x*canvasWidth)/maxX
-        y1 = (edge.startNode.y*canvasHeight)/maxY
-        x2 = (edge.finishNode.x*canvasWidth)/maxX
-        y2 = (edge.finishNode.y*canvasHeight)/maxY
-        canvas.create_line(x1,y1,x2,y2, fill=color, width=client.edgeSize.get())
+        x1 = (edge.startNode.x*window.canvasWidth)/maxX
+        y1 = (edge.startNode.y*window.canvasHeight)/maxY
+        x2 = (edge.finishNode.x*window.canvasWidth)/maxX
+        y2 = (edge.finishNode.y*window.canvasHeight)/maxY
+        window.canvas.create_line(x1,y1,x2,y2, fill=color, width=client.edgeSize.get())
         
         #Ajout du mode démo
         if client.demoMode.get() == True and skip == False: 
             while client.isPause == True or (client.isNext == False and client.autoNext.get() == False):
                 sleep(.1)
                 #print("In pause...")
-                root.update()
+                window.root.update()
                 
             if client.autoNext.get() == True :
                 sleep(client.sleepTime.get())
-                canvas.update()
+                window.canvas.update()
                 continue
             
-            canvas.update()
+            window.canvas.update()
             client.isNext = False
 
 def drawNodes(_graph, color):
@@ -164,24 +130,20 @@ def drawNodes(_graph, color):
     
     for node in _graph.nodesList :
         #Représentation des noeuds
-        xC = (node.x*canvasWidth)/maxX
-        yC = (node.y*canvasHeight)/maxY
-        canvas.create_rectangle(xC-4, yC-4, xC+4, yC+4, fill=color)
+        xC = (node.x*window.canvasWidth)/maxX
+        yC = (node.y*window.canvasHeight)/maxY
+        window.canvas.create_rectangle(xC-4, yC-4, xC+4, yC+4, fill=color)
         
         offsetX = -10
         offsetY = 0
-        if yC/canvasHeight > .85: offsetY = -10
-        elif  yC/canvasHeight < .15: offsetY = 10
-        if xC/canvasWidth < .15: offsetX = 10
+        if yC/window.canvasHeight > .85: offsetY = -10
+        elif  yC/window.canvasHeight < .15: offsetY = 10
+        if xC/window.canvasWidth < .15: offsetX = 10
         #Représentation des identifiants des noeuds
-        canvas.create_text(xC+offsetX, yC+offsetY, text=node.id, fill="#FFFFFF")
+        window.canvas.create_text(xC+offsetX, yC+offsetY, text=node.id, fill="#FFFFFF")
             
-def updateCostTour(cost):
-    global cost_text
-    cost_text.set("Best tour found : " + str(cost))
-
 def refreshDraw(*args):
-    canvas.delete("all")
+    window.canvas.delete("all")
     if client.displayNodes.get() and len(graphList) > 0 : drawNodes(graphList[0], client.nodesColorCode[1])
     if client.displayEdges.get() and len(graphList) > 0 : 
         if graphList[0].bestSolution != 0 : 
@@ -197,7 +159,7 @@ def refreshDraw(*args):
     representationEdgesColor.config(bg=client.edgesColorCode[1], fg=client.edgesColorCode[1])
 
 def drawSolution(solution):
-    canvas.delete("all")
+    window.canvas.delete("all")
     
     if client.displayEdges.get() and len(graphList) > 0 : 
         maxX = sorted(solution.hamiltonianCycleNodes, key=lambda x: x.x)[len(solution.hamiltonianCycleNodes) - 1].x# = canvasWidth (prend le maximum x des noeuds du graph )
@@ -207,38 +169,38 @@ def drawSolution(solution):
         #updateProgressBar(80, "Preparing to display graph arcs...")
         
         for edge in solution.hamiltonianCycleEdges :
-            x1 = (edge.startNode.x*canvasWidth)/maxX
-            y1 = (edge.startNode.y*canvasHeight)/maxY
-            x2 = (edge.finishNode.x*canvasWidth)/maxX
-            y2 = (edge.finishNode.y*canvasHeight)/maxY
-            canvas.create_line(x1,y1,x2,y2, fill=client.edgesColorCode[1], width=client.edgeSize.get())
+            x1 = (edge.startNode.x*window.canvasWidth)/maxX
+            y1 = (edge.startNode.y*window.canvasHeight)/maxY
+            x2 = (edge.finishNode.x*window.canvasWidth)/maxX
+            y2 = (edge.finishNode.y*window.canvasHeight)/maxY
+            window.canvas.create_line(x1,y1,x2,y2, fill=client.edgesColorCode[1], width=client.edgeSize.get())
             
     if client.displayNodes.get() and len(graphList) > 0 : 
         for node in solution.hamiltonianCycleNodes :
             #Représentation des noeuds
-            xC = (node.x*canvasWidth)/maxX
-            yC = (node.y*canvasHeight)/maxY
-            canvas.create_rectangle(xC-4, yC-4, xC+4, yC+4, fill=client.nodesColorCode[1])
+            xC = (node.x*window.canvasWidth)/maxX
+            yC = (node.y*window.canvasHeight)/maxY
+            window.canvas.create_rectangle(xC-4, yC-4, xC+4, yC+4, fill=client.nodesColorCode[1])
             
             offsetX = -10
             offsetY = 0
-            if yC/canvasHeight > .85: offsetY = -10
-            elif  yC/canvasHeight < .15: offsetY = 10
-            if xC/canvasWidth < .15: offsetX = 10
+            if yC/window.canvasHeight > .85: offsetY = -10
+            elif  yC/window.canvasHeight < .15: offsetY = 10
+            if xC/window.canvasWidth < .15: offsetX = 10
             #Représentation des identifiants des noeuds
-            canvas.create_text(xC+offsetX, yC+offsetY, text=node.id, fill="#FFFFFF")
-    canvas.update()
+            window.canvas.create_text(xC+offsetX, yC+offsetY, text=node.id, fill="#FFFFFF")
+    window.canvas.update()
     
 def loadBenchmark():
     currentTime = time()
     
     #Reset
-    cost_text.set(" ")
-    canvas.delete("all")
+    window.cost_text.set(" ")
+    window.canvas.delete("all")
     graphList.clear()
     
     
-    if not readfile(listbox.curselection()[0]): return #S'il n'est pas possible de lire le fichier TSP, c'est qu'il n'est pas compatible.
+    if not readfile(window.listbox.curselection()[0]): return #S'il n'est pas possible de lire le fichier TSP, c'est qu'il n'est pas compatible.
     loadFullGraphArcs(graphList[0])
     
     graphList[0].spawningTree = Kruskal(graphList[0])#Chargement de l'arbre couvrant de poids minimal
@@ -254,7 +216,8 @@ def loadBenchmark():
     two_opt(graphList[0])
     drawSolution(graphList[0].bestSolution)
     
-    two_opt(graphList[0])
+    window.showTrace(graphList[0].costListEvolution)
+    
     print("Temps de chargement total : " + str(time() - currentTime) + ".")
     
 def perfectMatching(_graph):
@@ -351,11 +314,14 @@ def hamiltonian(_graph):
         cost = cost + edge.cost
         
     _graph.bestSolution = Solution(visitingNodeOrder, edgesList, cost)
-    updateCostTour(cost)  
+    _graph.costListEvolution.append(cost)
+    window.cost_text.set("Best tour found : " + str(cost))
 
 def two_opt(_graph): 
+    loop = 0
+    currentTime = time()
     s0 = _graph.bestSolution.hamiltonianCycleNodes
-    print("best : ", str(_graph.bestSolution.cost))
+    #print("best : ", str(_graph.bestSolution.cost))
     
     sn = s0
     bestFound = s0.copy()
@@ -367,7 +333,7 @@ def two_opt(_graph):
     #    print(str(node.id))
     
     improve = True
-    while improve == True : 
+    while improve == True and loop < 1000: 
         improve = False
         for i in range(len(s0) - 1) :
             for j in range(len(s0) - 1) :
@@ -381,11 +347,13 @@ def two_opt(_graph):
                 cost = 0
                 for y in range(len(s0) - 1) :
                     cost = cost + math.sqrt(math.pow(sn[y].x - sn[y+1].x, 2) + math.pow(sn[y].y - sn[y+1].y, 2))
+                
                     #print("cost from ", str(sn[y].id), " to ", str(sn[y+1].id), " =", cost)  
                 
                 if  cost < bestCost :
                     bestFound = sn[:]
                     bestCost = cost
+                    _graph.costListEvolution.append(cost)
                     improve = True
                     #print("trouvé mieux :", bestCost)
                     
@@ -397,45 +365,39 @@ def two_opt(_graph):
                             
                         solution = Solution(bestFound, tempEdges, 0)
                         drawSolution(solution)
+                        window.cost_text.set("Best tour found : " + str(bestCost))
                         sleep(client.sleepTime.get())
+                    loop = loop + 1
                         
         s0 = bestFound[:]
         
-        #print("BEST found :")
-        #for node in bestFound :
-        #    print(str(node.id))
-        #print(bestCost)
-    
     for i in range(len(s0) - 1) :
         edges.append(Edge(s0[i], s0[i+1], 0))
         
     _graph.bestSolution = Solution(bestFound,edges,bestCost)
-    updateCostTour(bestCost)
-    #drawEdges(_graph, edges, "#0000FF")
+    window.cost_text.set("Best tour found : " + str(bestCost))
+    
+    print("2-OPT time : " + str(time() - currentTime) + ".")
     
 filesList()
 
-validate = tk.Button(root, text="Load", command=loadBenchmark).grid(column=0, row=3)
-drawNodesRadio = tk.Checkbutton(configuration, text="Display nodes", var=client.displayNodes, command=refreshDraw, bg="white").grid(column=0, row=0, pady=5)
-drawEdgesRadio = tk.Checkbutton(configuration, text="Display edges", var=client.displayEdges, command=refreshDraw, bg="white").grid(column=0, row=1, pady=5)
-edgesSizeScale = tk.Scale(configuration, orient='horizontal', var=client.edgeSize, command=refreshDraw, from_=0.5, to=10, resolution=0.25, tickinterval=4, length=100, label='Edge size', bg="white").grid(column=0, row=2, pady=5)
+validate = tk.Button(window.root, text="Load", command=loadBenchmark).grid(column=0, row=3)
+drawNodesRadio = tk.Checkbutton(window.configuration, text="Display nodes", var=client.displayNodes, command=refreshDraw, bg="white").grid(column=0, row=0, pady=5)
+drawEdgesRadio = tk.Checkbutton(window.configuration, text="Display edges", var=client.displayEdges, command=refreshDraw, bg="white").grid(column=0, row=1, pady=5)
+edgesSizeScale = tk.Scale(window.configuration, orient='horizontal', var=client.edgeSize, command=refreshDraw, from_=0.5, to=10, resolution=0.25, tickinterval=4, length=100, label='Edge size', bg="white").grid(column=0, row=2, pady=5)
 
-nodesColorBtn = tk.Button(configuration, text="Nodes color", command=lambda:[client.selectNodesColor(), refreshDraw()]).grid(column=0, row=3, sticky="w")
-representationNodesColor = tk.Label(configuration, text="CCC", bg=client.nodesColorCode[1], fg=client.nodesColorCode[1], borderwidth=2, relief="solid")
+nodesColorBtn = tk.Button(window.configuration, text="Nodes color", command=lambda:[client.selectNodesColor(), refreshDraw()]).grid(column=0, row=3, sticky="w")
+representationNodesColor = tk.Label(window.configuration, text="CCC", bg=client.nodesColorCode[1], fg=client.nodesColorCode[1], borderwidth=2, relief="solid")
 representationNodesColor.grid(column=0, row=3, sticky="e", pady=5)
 
-edgesColorBtn = tk.Button(configuration, text="Edges color", command=lambda:[client.selectEdgesColor(), refreshDraw()]).grid(column=0, row=4, sticky="w")
-representationEdgesColor = tk.Label(configuration, text="CCC", bg=client.edgesColorCode[1], fg=client.edgesColorCode[1], borderwidth=2, relief="solid")
+edgesColorBtn = tk.Button(window.configuration, text="Edges color", command=lambda:[client.selectEdgesColor(), refreshDraw()]).grid(column=0, row=4, sticky="w")
+representationEdgesColor = tk.Label(window.configuration, text="CCC", bg=client.edgesColorCode[1], fg=client.edgesColorCode[1], borderwidth=2, relief="solid")
 representationEdgesColor.grid(column=0, row=4, sticky="e", pady=5)
 
-demoModeRadio = tk.Checkbutton(configuration, text="DEMO MODE", var=client.demoMode, command=refreshDraw, bg="white").grid(column=0, row=5, pady=5)
-autoNextRadio = tk.Checkbutton(configuration, text="Auto next", var=client.autoNext, command=refreshDraw, bg="white").grid(column=0, row=6, pady=5)
-edgesSizeScale = tk.Scale(configuration, orient='horizontal', var=client.sleepTime, from_=0.1, to=2, resolution=.1, tickinterval=.8, length=100, label='Time step (s)', bg="white").grid(column=0, row=7, pady=5)
-pauseBtn = tk.Button(configuration, text="Pause", command=client.pause).grid(column=0, row=8, sticky="w")
-nextBtn = tk.Button(configuration, text=" Next ", command=client.next).grid(column=0, row=8, sticky="e")
+demoModeRadio = tk.Checkbutton(window.configuration, text="DEMO MODE", var=client.demoMode, command=refreshDraw, bg="white").grid(column=0, row=5, pady=5)
+autoNextRadio = tk.Checkbutton(window.configuration, text="Auto next", var=client.autoNext, command=refreshDraw, bg="white").grid(column=0, row=6, pady=5)
+edgesSizeScale = tk.Scale(window.configuration, orient='horizontal', var=client.sleepTime, from_=0.1, to=2, resolution=.1, tickinterval=.8, length=100, label='Time step (s)', bg="white").grid(column=0, row=7, pady=5)
+pauseBtn = tk.Button(window.configuration, text="Pause", command=client.pause).grid(column=0, row=8, sticky="w")
+nextBtn = tk.Button(window.configuration, text=" Next ", command=client.next).grid(column=0, row=8, sticky="e")
 
-
-root.mainloop()
-
-
-#Charger un fichier => N'afficher que les villes
+window.root.mainloop()
